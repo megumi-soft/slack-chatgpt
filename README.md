@@ -19,10 +19,7 @@
 
 ## 環境変数の設定
 
-  - `.env.development` ファイルを作成し、以下の情報を設定します：
-    - `OPENAI_API_KEY`: OpenAI APIのキー
-    - `SLACK_BOT_TOKEN`: Slack Botトークン
-  - `.env`ファイルはGit管理されないように`.gitignore`に含まれています。
+- `.env.development` ファイルを作成する
 
 ## セットアップ手順
 
@@ -50,6 +47,10 @@ gcloud functions deploy slack_bot \
     - アプリのOAuth & Permissionsページで、以下のスコープを追加します：
       - chat:write
       - chat:write.public
+      - channels:history
+      - groups:history
+      - im:history
+      - mpim:history
   3. イベントサブスクリプションの設定
     - App HomeのEvent SubscriptionsでEnable Eventsをオンにします。
     - Request URLに、Google Cloud FunctionsのエンドポイントURLを入力します。
