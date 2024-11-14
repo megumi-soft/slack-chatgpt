@@ -12,21 +12,15 @@ FunctionsFramework.http("slack_chatgpt_bot") do |request|
   return { status: 'OK' }.to_json unless body['event'] && body['event']['type'] == 'app_mention'
 
   channel = body['event']['channel']
-  latest_ts = body['event']['ts']
-  thread_ts = body['event']['thread_ts']
-  latest_message = body['event']['text']
-  # thread_tsが存在するのなら履歴を読み込む
-  messages = if thread_ts
-               get_thread_messages(channel, thread_ts)
-             else
-               [{ role: "user", content: latest_message }]
-             end
+  thread_ts = body['event']['ts']
+  # 履歴を読み込む
+  messages = get_thread_messages(channel, thread_ts)
 
   # OpenAI APIを呼び出す
   response_text = get_chatgpt_response(messages)
 
   # Slackに返信
-  send_message_to_slack(channel, latest_ts, response_text)
+  send_message_to_slack(channel, thread_ts, response_text)
 
   { status: 'OK' }.to_json
 end
@@ -93,7 +87,7 @@ def get_thread_messages(channel, thread_ts)
 end
 
 # Slackにメッセージを送信
-def send_message_to_slack(channel, latest_ts, text)
+def send_message_to_slack(channel, thread_ts, text)
   uri = URI("https://slack.com/api/chat.postMessage")
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
@@ -104,7 +98,7 @@ def send_message_to_slack(channel, latest_ts, text)
   request.body = {
     channel: channel,
     text: text,
-    thread_ts: latest_ts
+    thread_ts: thread_ts
   }.to_json
 
   http.request(request)
