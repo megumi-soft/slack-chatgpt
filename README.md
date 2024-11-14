@@ -32,8 +32,8 @@ bundle install
 2. Google Cloud Functionsにデプロイ
 
 ```bash
-gcloud functions deploy slack_bot \
-  --runtime ruby30 \
+gcloud functions deploy slack_chatgpt_bot \
+  --runtime ruby32 \
   --trigger-http \
   --allow-unauthenticated \
   --project hidesys

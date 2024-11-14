@@ -1,9 +1,9 @@
-require 'sinatra'
+require 'functions_framework'
 require 'json'
 require 'net/http'
 
 # Google Cloud Functionエントリーポイント
-def slack_bot(request)
+FunctionsFramework.http("slack_chatgpt_bot") do |request|
   body = JSON.parse(request.body.read)
 
   # Slackのエンベロープチャレンジを確認
