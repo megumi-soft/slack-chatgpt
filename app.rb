@@ -12,15 +12,20 @@ FunctionsFramework.http("slack_chatgpt_bot") do |request|
   return { status: 'OK' }.to_json unless body['event'] && body['event']['type'] == 'app_mention'
 
   channel = body['event']['channel']
-  thread_ts = body['event']['ts']
+  thread_ts = body['event']['thread_ts']
+  latest_ts = body['event']['ts']
   # 履歴を読み込む
-  messages = get_thread_messages(channel, thread_ts)
+  messages = if thread_ts
+               get_thread_messages(channel, thread_ts)
+             else
+               [{ role: 'user', content: body['event']['text'] }]
+             end
 
   # OpenAI APIを呼び出す
   response_text = get_chatgpt_response(messages)
 
   # Slackに返信
-  send_message_to_slack(channel, thread_ts, response_text)
+  send_message_to_slack(channel, latest_ts, response_text)
 
   { status: 'OK' }.to_json
 end
@@ -73,9 +78,11 @@ def get_thread_messages(channel, thread_ts)
       body['messages'].filter do |message|
         message['text'] && !message['text'].empty?
       end.map do |message|
+        role = message['user'] == ENV['SLACK_BOT_USER_ID'] ? 'assistant' : 'user'
+        content = message['text'].gsub(/\<\@#{ENV['SLACK_BOT_USER_ID']}\>/, '')
         {
-          role: message['user'] == ENV['SLACK_BOT_USER_ID'] ? 'assistant' : 'user',
-          content: message['text']
+          role: ,
+          content:
         }
       end
     else
