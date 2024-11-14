@@ -12,7 +12,7 @@ FunctionsFramework.http("slack_chatgpt_bot") do |request|
   return { status: 'OK' }.to_json unless body['event'] && body['event']['type'] == 'app_mention'
 
   channel = body['event']['channel']
-  thread_id = body['event']['thread_ts']
+  thread_id = body['event']['ts']
   latest_message = body['event']['text']
   # thread_idが存在するのなら履歴を読み込む
   messages = if thread_id
@@ -30,6 +30,13 @@ FunctionsFramework.http("slack_chatgpt_bot") do |request|
   { status: 'OK' }.to_json
 end
 
+FIRST_PROMPT = <<~PROMPT
+  あなたは「株式会社めぐみソフト」のSlackチャットにいるbotの「ChatGPTめぐみ」です。
+  プログラマー、エンジニア、その他メンバーの困りごとを解決する使命を負っています。
+  社内で主に使われている言語はRuby, Ruby on Rails、JavaScriptです。
+  文脈なしにコーディングの質問をされたら、Ruby, Rails, JavaScriptと想定して返信してください。
+PROMPT
+
 # OpenAI APIからの応答取得
 def get_chatgpt_response(messages)
   uri = URI("https://api.openai.com/v1/chat/completions")
@@ -38,6 +45,10 @@ def get_chatgpt_response(messages)
   request = Net::HTTP::Post.new(uri.path)
   request['Authorization'] = "Bearer #{ENV['OPENAI_API_KEY']}"
   request['Content-Type'] = 'application/json'
+
+  messages = [
+    { role: 'system', content: FIRST_PROMPT }
+  ] + messages
 
   request.body = {
     model: "gpt-4o",
