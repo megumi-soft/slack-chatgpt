@@ -2,6 +2,8 @@ require 'functions_framework'
 require 'json'
 require 'net/http'
 require "google/cloud/firestore"
+require 'uri'
+require 'nokogiri'
 
 # Google Cloud Functionエントリーポイント
 FunctionsFramework.http("slack_chatgpt_bot") do |request|
@@ -23,6 +25,7 @@ FunctionsFramework.http("slack_chatgpt_bot") do |request|
              else
                [{ role: 'user', content: body['event']['text'] }]
              end
+  messages = get_url_contents(messages)
 
   # OpenAI APIを呼び出す
   response_text = get_chatgpt_response(messages)
@@ -61,7 +64,65 @@ FIRST_PROMPT = <<~PROMPT
   なおこのメッセージはSlack上でやり取りしています。
   返信するテキストはSlackの強調ルールに従ってください。
   すなわち、太字は *強調* 、インラインコードは `コード` 、コードブロックは ```コードブロック``` としてください。
+  また絵文字は :blush: などのコードで表現してください。
+
+  ■ URLについて
+  メッセージ内にURLが含まれている場合、前処理として中身を取得してメッセージに混ぜてあります。
+  内容はすでにメッセージに混ぜてあるので、メッセージ内からWebページの内容を参照し、自信を持って回答してください。
 PROMPT
+
+def get_url_contents(messages)
+  messages = [
+    { role: 'system', content: FIRST_PROMPT }
+  ] + messages
+
+  last_content = messages.last[:content]
+  urls = extract_urls(last_content)
+  return messages if urls.empty?
+
+  urls.each do |url|
+    # URLのコンテンツを取得
+    messages << { role: 'system', content: get_url_content(url) }
+  end
+
+  puts messages.to_json
+
+  messages
+end
+
+def extract_urls(text)
+  text.scan(/\bhttps?:\/\/\S+\b/)
+end
+
+def get_url_content(url)
+  uri = URI.parse(url)
+  response = Net::HTTP.get_response(uri)
+  content = case response
+            when Net::HTTPSuccess
+              case response['content-type']
+              when /text\/html/
+                doc = Nokogiri::HTML(response.body)
+                text = doc.css('body').inner_text.strip
+                # 元の文字コードを取得し、UTF-8に変換
+                text.encode!(doc.encoding, 'UTF-8', invalid: :replace, undef: :replace)
+
+                # 連続する空白を一つに、連続する改行を一つに
+                text.gsub(/\s+/, ' ').gsub(/\n+/, "\n").strip
+              when /text\/plain/
+                response.body
+              else
+                "内容を読めませんでした。こちらは#{response['content-type']}形式のファイルです。"
+              end
+            else
+              "Error: #{response.code}; #{response.message}"
+            end
+
+  <<~CONTENT
+    Content of #{url}
+    ---
+    #{content}
+  CONTENT
+end
 
 # OpenAI APIからの応答取得
 def get_chatgpt_response(messages)
@@ -71,10 +132,6 @@ def get_chatgpt_response(messages)
   request = Net::HTTP::Post.new(uri.path)
   request['Authorization'] = "Bearer #{ENV['OPENAI_API_KEY']}"
   request['Content-Type'] = 'application/json'
-
-  messages = [
-    { role: 'system', content: FIRST_PROMPT }
-  ] + messages
 
   request.body = {
     model: "gpt-4o",
@@ -107,7 +164,7 @@ def get_thread_messages(channel, thread_ts)
         role = message['user'] == ENV['SLACK_BOT_USER_ID'] ? 'assistant' : 'user'
         content = message['text'].gsub(/\<\@#{ENV['SLACK_BOT_USER_ID']}\>/, '')
         {
-          role: ,
+          role:,
           content:
         }
       end
