@@ -34,8 +34,8 @@ FunctionsFramework.http("slack_chatgpt_bot") do |request|
 end
 
 def already_executed?(client_msg_id)
-  firestore = Google::Cloud::Firestore.new
-  doc = firestore.doc("slack-chatgpt-bot/#{client_msg_id}")
+  firestore = Google::Cloud::Firestore.new(database_id: 'slack-chatgpt-bot')
+  doc = firestore.doc("executed_events/#{client_msg_id}")
   return true if doc.get.exists?
 
   # 保存
@@ -48,6 +48,8 @@ FIRST_PROMPT = <<~PROMPT
   プログラマー、エンジニア、その他メンバーの困りごとを解決する使命を負っています。
   社内で主に使われている言語はRuby, Ruby on Rails、JavaScriptです。
   文脈なしにコーディングの質問をされたら、Ruby, Rails, JavaScriptと想定して返信してください。
+
+  なおこのメッセージはSlack上でやり取りしています。返信するテキストはSlackの強調ルールに従ってください。
 PROMPT
 
 # OpenAI APIからの応答取得
