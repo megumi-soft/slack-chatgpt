@@ -1,6 +1,7 @@
 require 'functions_framework'
 require 'json'
 require 'net/http'
+require "google/cloud/firestore"
 
 # Google Cloud Functionエントリーポイント
 FunctionsFramework.http("slack_chatgpt_bot") do |request|
@@ -10,6 +11,8 @@ FunctionsFramework.http("slack_chatgpt_bot") do |request|
   return { challenge: body['challenge'] }.to_json if body['type'] == 'url_verification'
   # Slackからのイベント処理
   return { status: 'OK' }.to_json unless body['event'] && body['event']['type'] == 'app_mention'
+  # すでに処理済みのイベントは無視
+  return { status: 'OK' }.to_json if already_executed?(body['event']['client_msg_id'])
 
   channel = body['event']['channel']
   thread_ts = body['event']['thread_ts']
@@ -28,6 +31,16 @@ FunctionsFramework.http("slack_chatgpt_bot") do |request|
   send_message_to_slack(channel, latest_ts, response_text)
 
   { status: 'OK' }.to_json
+end
+
+def already_executed?(client_msg_id)
+  firestore = Google::Cloud::Firestore.new
+  doc = firestore.doc("slack-chatgpt-bot/#{client_msg_id}")
+  return true if doc.get.exists?
+
+  # 保存
+  doc.set({ client_msg_id:, executed_at: Time.now })
+  false
 end
 
 FIRST_PROMPT = <<~PROMPT
