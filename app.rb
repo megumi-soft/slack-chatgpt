@@ -91,7 +91,8 @@ def get_url_contents(messages)
 end
 
 def extract_urls(text)
-  text.scan(/\bhttps?:\/\/\S+\b/)
+  matches = text.scan(/\<(https?:\/\/\S+)\>/)
+  matches.flatten
 end
 
 def get_url_content(url)
@@ -121,6 +122,12 @@ def get_url_content(url)
     Content of #{url}
     ---
     #{content}
+  CONTENT
+rescue URI::InvalidURIError
+  <<~CONTENT
+    Content of #{url}
+    ---
+    URLが正しくありません。
   CONTENT
 end
 
